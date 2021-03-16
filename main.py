@@ -89,11 +89,23 @@ t_total = time.time()
 n_epochs_stop = 10
 epochs_no_improve = 0
 early_stop = False
+min_val_loss = np.Inf
+
 for epoch in range(args.epochs):
     val_loss = train(epoch)
+    if val_loss < min_val_loss:
+        epochs_no_improve = 0
+        min_val_loss = val_loss
+    else:
+        epochs_no_improve += 1
+    if epoch > 5 and epochs_no_improve == n_epochs_stop:
+        # print("Early Stopping")
+        early_stop = True
+        break
+    else:
+        continue
 
-print("Optimization Finished!")
+print("Training completed!")
 print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 
-# Testing
 test()
