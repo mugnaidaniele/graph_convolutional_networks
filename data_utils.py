@@ -1,39 +1,66 @@
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
-import pandas as pd
+import scipy.sparse as sp
+import torch
 
 
-def get_content(content, cities):
-    le_index = LabelEncoder()
-    le_label = LabelEncoder()
-
-    df = pd.read_csv(content, sep="\t", header=None)
-    df_cities = pd.read_csv(cities, sep="\t", header=None)
-
-    df[0] = le_index.fit_transform(df[0].values)
-    df[df.shape[1] - 1] = le_label.fit_transform(df[df.shape[1] - 1].values)
-    label = df[df.shape[1] - 1]
-    df = df.drop(df.shape[1] - 1, axis=1)
-    df = df.drop(0, axis=1)
-
-    num_lines = sum(1 for line in open(content))
-    adj = np.zeros((num_lines, num_lines)) + np.eye(num_lines)
-
-    df_cities[0] = le_index.transform(df_cities[0].values)
-    df_cities[df_cities.shape[1] - 1] = le_index.transform(df_cities[df_cities.shape[1] - 1].values)
-
-    cit = df_cities.to_numpy()
-    for coords in cit:
-        x, y = coords[0], coords[1]
-        adj[x][y] = 1
-        adj[y][x] = 1
-
-    label = label.to_numpy()
-    features = df.to_numpy()
-
-    return adj, features, label
+def encode_one_hot(labels):
+    classes = set(labels)
+    classes_dict = {c: np.identity(len(classes))[i, :] for i, c in
+                    enumerate(classes)}
+    labels_one_hot = np.array(list(map(classes_dict.get, labels)),
+                              dtype=np.int32)
+    return labels_one_hot
 
 
-# TODO SPLIT DATASET
-# TODO NORMALIZE
-adj, features, label = get_content("cora/cora.content", "cora/cora.cites")
+def load_data(path="cora/", dataset="cora"):
+    print('Loading {} dataset...'.format(dataset))
+
+    idx_features_labels = np.genfromtxt("{}{}.content".format(path, dataset),
+                                        dtype=np.dtype(str))
+    features = (idx_features_labels[:, 1:-1]).astype(np.float32)
+    labels = encode_one_hot(idx_features_labels[:, -1])
+
+    idx = np.array(idx_features_labels[:, 0], dtype=np.int32)
+    idx_map = {j: i for i, j in enumerate(idx)}
+    edges_unordered = np.genfromtxt("{}{}.cites".format(path, dataset),
+                                    dtype=np.int32)
+    edges = np.array(list(map(idx_map.get, edges_unordered.flatten())),
+                     dtype=np.int32).reshape(edges_unordered.shape)
+
+    adj = np.eye(features.shape[0])
+    for coord in edges:
+        adj[coord[0], coord[1]] = 1
+        adj[coord[1], coord[0]] = 1
+
+    features = normalize(features)
+    adj = normalize(adj + sp.eye(adj.shape[0]))
+
+    idx_train = range(140)
+    idx_val = range(200, 500)
+    idx_test = range(500, 1500)
+
+    features = torch.FloatTensor(features)
+    labels = torch.LongTensor(np.where(labels)[1])
+    adj = torch.FloatTensor(adj)
+
+    idx_train = torch.LongTensor(idx_train)
+    idx_val = torch.LongTensor(idx_val)
+    idx_test = torch.LongTensor(idx_test)
+
+    return adj, features, labels, idx_train, idx_val, idx_test
+
+
+def normalize(matrix):
+    row_sum = np.array(matrix.sum(1))
+    r_inv = np.power(row_sum, -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = sp.diags(r_inv)
+    matrix = r_mat_inv.dot(matrix)
+    return matrix
+
+
+def accuracy(output, labels):
+    predictions = output.max(1)[1].type_as(labels)
+    correct = predictions.eq(labels).double()
+    correct = correct.sum()
+    return correct / len(labels)
