@@ -5,9 +5,9 @@
 ###Results
 | Dataset  | Papers Accuracy  | Implementation accuracy |
 | :---: | :---: | :---: |
-| Content Cell  | Content Cell  | Content Cell  |
-| Content Cell  | Content Cell  | Content Cell  |
-| Content Cell  | Content Cell  | Content Cell  |
-| Content Cell  | Content Cell  | Content Cell  |
+| Cora | 81.5 | 83.8  |
+| Citeseer | 70.3  | Content Cell  |
+| Pubmed  | 79.0  | Content Cell  |
+| NELL  | 66.0  | Content Cell  |
 
 ### References
