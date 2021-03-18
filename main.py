@@ -6,13 +6,13 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from data_utils import load_data, accuracy
+from data_utils import load_data, accuracy, load_citeseer
 from model import GCN
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-parser.add_argument('--epochs', type=int, default=200,
+parser.add_argument('--epochs', type=int, default=300,
                     help='Number of epochs to train.')
 parser.add_argument('--lr', type=float, default=0.01,
                     help='Initial learning rate.')
@@ -30,8 +30,7 @@ torch.manual_seed(args.seed)
 torch.cuda.manual_seed(args.seed)
 
 # Load data
-adj, features, labels, idx_train, idx_val, idx_test = load_data()
-
+adj, features, labels, idx_train, idx_val, idx_test = load_citeseer()
 # Model and optimizer
 model = GCN(input_size=features.shape[1],
             hidden_size=args.hidden,
@@ -93,17 +92,18 @@ min_val_loss = np.Inf
 
 for epoch in range(args.epochs):
     val_loss = train(epoch)
-    if val_loss < min_val_loss:
-        epochs_no_improve = 0
-        min_val_loss = val_loss
-    else:
-        epochs_no_improve += 1
-    if epoch > 5 and epochs_no_improve == n_epochs_stop:
-        # print("Early Stopping")
-        early_stop = True
-        break
-    else:
-        continue
+    if early_stop:
+        if val_loss < min_val_loss:
+            epochs_no_improve = 0
+            min_val_loss = val_loss
+        else:
+            epochs_no_improve += 1
+        if epoch > 5 and epochs_no_improve == n_epochs_stop:
+            # print("Early Stopping")
+            early_stop = True
+            break
+        else:
+            continue
 
 print("Training completed!")
 print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
